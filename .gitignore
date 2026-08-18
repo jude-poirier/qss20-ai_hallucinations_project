@@ -1,0 +1,9 @@
+bulk-data/
+bulk/
+*.bz2
+*.csv.bz2
+labeling/pooled_coded.csv
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
