@@ -15,6 +15,7 @@ import re
 # ----------------------------------------------------------------------
 _TIER = {
     4: ["bar referr", "disciplinary referr", "grievance", "referred to the",
+        "referral to", "state bar", "referred to the bar",
         "suspend", "suspension", "disbar", "disqualif", "pro hac vice",
         "revoc", "revoked", "contempt", "vexatious", "filing bar",
         "dismiss", "default judgment", "terminat", "struck the case", "censure"],
@@ -32,6 +33,16 @@ _NO_SANCTION = ["no sanction", "sanctions denied", "motion for sanctions is deni
 _TRIGGER = re.compile(r"(rule\s*11|§?\s*1927|section\s*1927|inherent\s+authority|"
                       r"sanction|show\s+cause|disciplin|referr)", re.I)
 
+# remove negated sanction spans ("no monetary sanctions", "declined to impose") so a
+# negated keyword can't set a tier. Runs before tier matching in both coding paths.
+_NEG_SPAN = re.compile(
+    r"\bno\s+(?:\w+\s+){0,3}?(sanction|monetar|fine|penalt|fee|cost|discipl|referr|"
+    r"suspens|contempt|disqualif)\w*|declin\w+\s+to\s+(impose|award)|"
+    r"denied\s+the\s+motion\s+for\s+sanctions|motion\s+for\s+sanctions\s+(is\s+)?denied", re.I)
+
+def _strip_negated(text):
+    return _NEG_SPAN.sub(" ", text)
+
 def locate_sanction_region(text, window=1200):
     """Return the slice of an opinion around the first sanctions trigger.
     Coding severity on the whole opinion invites false hits; code the region."""
@@ -44,24 +55,73 @@ def locate_sanction_region(text, window=1200):
     return text[max(0, i - 200): i + window]
 
 def code_severity(text_or_outcome, is_full_opinion=False):
-    """Return an integer severity tier 0-4.
-    - For CONTROL opinions (raw text): pass is_full_opinion=True so we first
-      locate the sanctions region.
-    - For Charlotin's short `Outcome` field: pass is_full_opinion=False.
-    Both paths then run the identical tier ladder."""
+    """Return an integer severity tier 0-4 (0 none .. 4 professional/terminal).
+
+    Two paths, on purpose:
+    - is_full_opinion=False  -> Charlotin's short `Outcome` field. The field *is* the
+      outcome, so any tier keyword present sets that tier (original ladder, unchanged).
+    - is_full_opinion=True   -> a full control opinion. Here a tier keyword appearing
+      anywhere is NOT enough (legal prose mentions "dismiss"/"discipline" incidentally),
+      so we require (a) a sanctions region, (b) no denial language, and (c) an actual
+      imposition cue near the sanction type. This is what stops the controls over-coding
+      to tier 4.
+    """
     if not isinstance(text_or_outcome, str) or not text_or_outcome:
         return 0
-    s = (locate_sanction_region(text_or_outcome) if is_full_opinion
-         else str(text_or_outcome)).lower()
-    if not s:
-        return 0
-    # explicit "no sanction" wins only if no higher tier keyword is present
+    if is_full_opinion:
+        return _severity_full(text_or_outcome)
+    s = _strip_negated(str(text_or_outcome).lower())
     for tier in (4, 3, 2, 1):
         if any(k in s for k in _TIER[tier]):
             return tier
-    if any(k in s for k in _NO_SANCTION):
-        return 0
     return 0
+
+
+# --- full-opinion severity: require an IMPOSED sanction, not just the topic ---
+_DENIAL = re.compile(
+    r"(sanctions?\s+(are|is|were|was)?\s*denied|deny(ing)?\s+the\s+motion\s+for\s+sanctions|"
+    r"declin\w*\s+to\s+(impose|award)|no\s+sanctions?\s+(are|is|were|will|shall)|"
+    r"motion\s+for\s+sanctions\s+is\s+denied|denying\s+.{0,20}sanctions)", re.I)
+_IMPOSE = re.compile(
+    r"(impos\w+|grant\w+|award\w+|we\s+sanction|is\s+sanctioned|are\s+sanctioned|"
+    r"order\w*\s+to\s+pay|shall\s+pay|ordered\s+to|refer\w+|suspend\w+|disbar\w+|"
+    r"disqualif\w+|struck|stricken|dismiss\w+|fined|held\s+in\s+contempt|accepts?\s+the\s+agreement)", re.I)
+_T4F = re.compile(
+    r"(bar\s+referr|referred\s+to\s+the\s+(state\s+)?bar|suspen\w+|disbar|disqualif|pro\s+hac\s+vice|"
+    r"held\s+in\s+contempt|contempt\s+of\s+court|vexatious|dismiss\w*\s+as\s+a\s+sanction|"
+    r"terminating\s+sanction|censure|disciplin\w+|referr\w*\s+to\s+(the\s+)?(state\s+)?bar|state\s+bar)", re.I)
+_T3F = re.compile(
+    r"(monetary\s+sanction|monetary\s+penalt|\bfine[ds]?\b|attorney'?s?\s+fees|adverse\s+costs|"
+    r"shall\s+pay|ordered\s+to\s+pay|disgorge|sanction\w*\s+of\s+\$)", re.I)
+_T2F = re.compile(
+    r"(show\s+cause|struck|stricken|strike|waiv\w+|mandatory\s+cle|\bcle\b|certif\w+|"
+    r"refile|amend\w*\s+(the\s+)?(brief|filing))", re.I)
+_T1F = re.compile(r"(warning|admonish|caution|reprimand|rebuke|chastis)", re.I)
+
+def _severity_full(text):
+    region = locate_sanction_region(text)
+    if not region:
+        return 0
+    region = _strip_negated(region)
+    if _DENIAL.search(region):
+        return 0
+    imposed = bool(_IMPOSE.search(region))
+    if _T4F.search(region) and imposed: return 4
+    if _T3F.search(region) and imposed: return 3
+    if _T2F.search(region) and imposed: return 2
+    if _T1F.search(region):             return 1
+    return 0
+
+
+# --- frame filter: standalone bar-discipline proceedings are not Rule 11 litigation
+#     sanctions, so they are not comparable to AI-hallucination cases. Drop them. ---
+_BARDISC = re.compile(
+    r"(bar\s+association|disciplinary\s+(proceeding|matter|board|counsel)|\brule\s*6\b|"
+    r"reinstatement|resign\w*\s+with\s+disciplin|licensed\s+to\s+practice)", re.I)
+
+def is_bar_discipline(text):
+    """True for standalone attorney-discipline proceedings (wrong control population)."""
+    return bool(isinstance(text, str) and _BARDISC.search(text))
 
 # ----------------------------------------------------------------------
 # 2. REPRESENTATION  (pro se vs counseled). Return 1, 0, or None (unclear).

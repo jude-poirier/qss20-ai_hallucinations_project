@@ -16,7 +16,7 @@ import argparse, pandas as pd, numpy as np, label_lib as L
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--csv", default="/mnt/user-data/uploads/Charlotin-hallucination_cases.csv")
+    ap.add_argument("--csv", default="../../data/raw/Charlotin-hallucination_cases.csv")
     ap.add_argument("--text-col", default="Details")   # opinion text col for controls; Details here
     ap.add_argument("--n", type=int, default=90)
     ap.add_argument("--seed", type=int, default=20)

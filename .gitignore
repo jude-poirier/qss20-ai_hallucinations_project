@@ -1,9 +1,56 @@
+# ===============================================================
+# DATA — no data files are committed.
+#
+# Everything under data/ is ignored, but the folder skeleton is
+# kept (via .gitkeep) so the repo still shows where each file
+# belongs. Inventory, provenance and download links:
+#   data/README.md
+#
+# To commit the small CSVs after all (~3.7 MB total, well under
+# GitHub's limits), delete the "data/**" line below. The bulk-data
+# rules must stay either way.
+# ===============================================================
+
+# all data files, at any depth
+data/**
+
+# the 2.3 GB CourtListener snapshot — never commit this; it blows
+# past GitHub's 100 MB hard limit and the push will be rejected
 bulk-data/
 bulk/
 *.bz2
 *.csv.bz2
-labeling/pooled_coded.csv
+
+# rebuildable intermediates
+*.pkl
+
+# hand-coding artifacts produced by code/labeling/
+handcoding_template.csv
+
+# ===============================================================
+# Python / Jupyter / OS cruft
+# ===============================================================
 __pycache__/
 *.pyc
+*.pyo
 .ipynb_checkpoints/
 .DS_Store
+.venv/
+venv/
+
+# ===============================================================
+# Staged for deletion — the pre-reorganization copy of the repo.
+# Safe to delete this folder outright once you've confirmed the new
+# layout works; nothing in it is referenced by any notebook.
+# ===============================================================
+_to_delete/
+
+# ===============================================================
+# Re-includes — MUST come last. Git cannot resurrect a file whose
+# parent directory is still excluded, so directories are re-included
+# before the .gitkeep files inside them.
+# ===============================================================
+!data/**/
+!data/raw/bulk-data/
+!**/.gitkeep
+!data/README.md
