@@ -78,38 +78,60 @@ def code_severity(text_or_outcome, is_full_opinion=False):
 
 
 # --- full-opinion severity: require an IMPOSED sanction, not just the topic ---
-_DENIAL = re.compile(
-    r"(sanctions?\s+(are|is|were|was)?\s*denied|deny(ing)?\s+the\s+motion\s+for\s+sanctions|"
-    r"declin\w*\s+to\s+(impose|award)|no\s+sanctions?\s+(are|is|were|will|shall)|"
-    r"motion\s+for\s+sanctions\s+is\s+denied|denying\s+.{0,20}sanctions)", re.I)
-_IMPOSE = re.compile(
-    r"(impos\w+|grant\w+|award\w+|we\s+sanction|is\s+sanctioned|are\s+sanctioned|"
-    r"order\w*\s+to\s+pay|shall\s+pay|ordered\s+to|refer\w+|suspend\w+|disbar\w+|"
-    r"disqualif\w+|struck|stricken|dismiss\w+|fined|held\s+in\s+contempt|accepts?\s+the\s+agreement)", re.I)
+# widened trigger so contempt/default-judgment/dismissal regions are located too
+_TRIG_FULL = re.compile(r"rule\s*11|§?\s*1927|section\s*1927|inherent\s+authority|sanction|"
+                        r"show\s+cause|disciplin|referr|contempt|default\s+judgment|dismiss", re.I)
+
+def _region_full(text, before=500, after=2500):
+    m = _TRIG_FULL.search(text)
+    return text if not m else text[max(0, m.start()-before): m.start()+after]
+
+# criminal-sentencing / licensing-board language: not a Rule 11-type litigation sanction
+_CRIM = re.compile(r"community[\s-]*control\s+sanction|felony\s+sentenc|misdemeanor|prison\s+term|"
+                   r"r\.?c\.?\s*2929|nursing\s+board|medical\s+board|state\s+medical|licens\w+\s+board", re.I)
+
+# expanded negation: negated sanctions + negated contempt + "not warranted"/"moot"
+_NEG_FULL = re.compile(
+    r"\bno\s+(?:\w+\s+){0,3}?(sanction|monetar|fine|penalt|fee|cost)\w*|"
+    r"declin\w+\s+to\s+(impose|award|hold)|deny\w*\s+.{0,25}?sanction|"
+    r"sanctions?\s+(are|is|were|was)?\s*(not\s+warranted|denied)|not\s+warranted|\bmoot\b|"
+    r"would\s+only\s+order|never\s+(\w+\s+){0,4}?contempt|not\s+.{0,15}?in\s+contempt|"
+    r"declin\w+\s+to\s+hold.{0,25}?contempt", re.I)
+
+# tier-4 (terminating / professional) -- self-imposing strong actions
 _T4F = re.compile(
-    r"(bar\s+referr|referred\s+to\s+the\s+(state\s+)?bar|suspen\w+|disbar|disqualif|pro\s+hac\s+vice|"
-    r"held\s+in\s+contempt|contempt\s+of\s+court|vexatious|dismiss\w*\s+as\s+a\s+sanction|"
-    r"terminating\s+sanction|censure|disciplin\w+|referr\w*\s+to\s+(the\s+)?(state\s+)?bar|state\s+bar)", re.I)
+    r"default\s+judgment|dismiss\w*\s+(the\s+\w+\s+){0,3}?(as|for)\s+(a\s+)?(discovery\s+|terminating\s+)?sanction|"
+    r"dismiss\w*\s+.{0,40}?failure\s+to\s+comply|strik\w+\s+(the\s+)?(pleadings?|answer|complaint)|"
+    r"(held|found|finding|adjudged|holding)\s+.{0,15}?contempt|in\s+civil\s+contempt|"
+    r"suspen\w+\s+from|suspension\s+from|\d+[\s-]month\s+suspension|disbar|disqualif|"
+    r"referr\w*\s+to\s+(the\s+)?(state\s+)?bar|bar\s+referr|pro\s+hac\s+vice|vexatious|"
+    r"terminating\s+sanction|case[\s-]dispositive|preclu\w+\s+.{0,20}?(evidence|witness|claim)|censure", re.I)
+# tier-3 (monetary)
 _T3F = re.compile(
-    r"(monetary\s+sanction|monetary\s+penalt|\bfine[ds]?\b|attorney'?s?\s+fees|adverse\s+costs|"
-    r"shall\s+pay|ordered\s+to\s+pay|disgorge|sanction\w*\s+of\s+\$)", re.I)
+    r"monetary\s+sanction|monetary\s+penalt|sanction\w*\s+of\s+\$|\$[\d,]+\s+.{0,20}?sanction|"
+    r"pay\w*\s+.{0,20}?as\s+a\s+sanction|imposing\s+sanctions?\s+on|attorney'?s?\s+fees|adverse\s+costs|"
+    r"ordered\s+to\s+pay|shall\s+pay|\bfined\b|disgorge|awarded?\s+.{0,15}?(fees|costs)\s+as\s+a\s+sanction", re.I)
+# tier-2 (procedural/corrective) -- note: bare argument-waiver removed (routine appellate procedure)
 _T2F = re.compile(
-    r"(show\s+cause|struck|stricken|strike|waiv\w+|mandatory\s+cle|\bcle\b|certif\w+|"
-    r"refile|amend\w*\s+(the\s+)?(brief|filing))", re.I)
-_T1F = re.compile(r"(warning|admonish|caution|reprimand|rebuke|chastis)", re.I)
+    r"order\w*\s+to\s+show\s+cause|show\s+cause\s+order|struck|stricken|"
+    r"mandatory\s+cle|\bcle\b|certif\w+|ordered\s+to\s+(correct|refile|amend|disclose|attend)", re.I)
+# tier-1 (warning) -- tied to a court actor to avoid criminal "warning" noise
+_T1F = re.compile(
+    r"admonish\w*|reprimand\w*|rebuke|chastis\w+|caution\w*\s+(counsel|the\s+attorney|plaintiff|defendant)|"
+    r"warn\w*\s+(counsel|the\s+attorney|the\s+party|plaintiff|defendant)|counsel\s+is\s+warned", re.I)
 
 def _severity_full(text):
-    region = locate_sanction_region(text)
+    region = _region_full(text)
     if not region:
         return 0
-    region = _strip_negated(region)
-    if _DENIAL.search(region):
+    # criminal community-control / licensing board -> not a litigation sanction
+    if _CRIM.search(region) and not re.search(r"rule\s*11|1927|attorney", region, re.I):
         return 0
-    imposed = bool(_IMPOSE.search(region))
-    if _T4F.search(region) and imposed: return 4
-    if _T3F.search(region) and imposed: return 3
-    if _T2F.search(region) and imposed: return 2
-    if _T1F.search(region):             return 1
+    region = _NEG_FULL.sub(" ", region)
+    if _T4F.search(region): return 4
+    if _T3F.search(region): return 3
+    if _T2F.search(region): return 2
+    if _T1F.search(region): return 1
     return 0
 
 
@@ -118,6 +140,12 @@ def _severity_full(text):
 _BARDISC = re.compile(
     r"(bar\s+association|disciplinary\s+(proceeding|matter|board|counsel)|\brule\s*6\b|"
     r"reinstatement|resign\w*\s+with\s+disciplin|licensed\s+to\s+practice)", re.I)
+
+def is_criminal_or_licensing(text):
+    """True for criminal community-control sentencing and licensing-board matters --
+    not Rule 11 litigation sanctions, so not a comparable control population."""
+    return bool(isinstance(text, str) and _CRIM.search(text)
+                and not re.search(r"rule\\s*11|1927|attorney", text, re.I))
 
 def is_bar_discipline(text):
     """True for standalone attorney-discipline proceedings (wrong control population)."""

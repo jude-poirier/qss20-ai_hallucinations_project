@@ -1,100 +1,57 @@
 # Labeling toolkit
 
-Coding infrastructure shared by both arms of the AI-vs-non-AI comparison, plus the machinery
-for proving how reliable that coding is.
+The coding infrastructure shared across the pipeline, plus the machinery for measuring how reliable
+that coding is. The decision rules live in `../../docs/LABELING_CODEBOOK.md` — read that first; this
+file is the how-to-run.
 
-**Read [`../../docs/LABELING_CODEBOOK.md`](../../docs/LABELING_CODEBOOK.md) first** — it holds
-the actual decision rules. This file is the how-to-run.
-
-The whole point of this directory: code the AI cases and the control cases the *same* way, from
-the *same* kind of source, so an "AI vs non-AI" comparison isn't contaminated by differences in
-how the two groups were labeled.
+The goal: code the AI cases and the control cases as alike as possible, and be able to say with a
+number how much to trust each coded variable.
 
 ## Files
 
 | File | What it is |
 |---|---|
-| `label_lib.py` | The automated coder. One pipeline for both arms: `code_severity`, `code_pro_se`, `field_from_nos`, `is_ai_contaminated`, `code_case`. |
+| `label_lib.py` | The coder. `code_severity` (0–4), `code_pro_se`, `field_from_nos`, plus the control-frame filters `is_ai_contaminated`, `is_bar_discipline`, `is_criminal_or_licensing`. Imported by notebooks 02–04. |
 | `make_handcoding_sample.py` | Draws a stratified sample across severity tiers and writes a blank hand-coding template. |
-| `validate_coding.py` | Scores the auto coder against your hand codes — accuracy, within-1-tier, Cohen's kappa. |
+| `validate_coding.py` | Scores the regex coder against hand codes (accuracy, within-1, Cohen's kappa). |
+| `validate_llm.py` | Scores the LLM coder against hand codes. Same idea, for the LLM path. |
+| `llm_coder.py` | Optional: codes controls via the Anthropic API if you have a key. Not needed if you code in a chat window instead. |
 
-`label_lib.py` is imported by `../02_build_controls.ipynb`. The two scripts are standalone and
-are run from this directory.
+## Two coding paths in `label_lib.code_severity`
 
-## Workflow
+- **Short-outcome path** (`is_full_opinion=False`) — reads Charlotin's terse `Outcome` field for the
+  AI arm. Any tier keyword present sets that tier. Validated at kappa 0.87 on its own sample.
+- **Full-opinion path** (`is_full_opinion=True`) — reads a full control opinion. A keyword appearing
+  anywhere is not enough (opinions mention "dismiss"/"discipline" incidentally), so it requires a
+  sanctions region, no denial language, and an imposition cue near the sanction type.
 
-### 1. Freeze the rules
-Open the codebook. If you disagree with a rule, change it *now*, before coding anything. The
-rules in the codebook and the keyword lists in `label_lib.py` must stay in sync — if you edit
-one, edit the other.
+On full opinions the regex path still plateaued (held-out kappa 0.36), so the controls are coded by
+an LLM instead; the regex coder remains here as the documented first attempt. See
+`../../docs/VALIDATION.md`.
 
-### 2. Pull the two groups
-- **AI arm** — already in the Charlotin data. For rigor, follow each row's `Pointer`/`Source`
-  link and fetch the actual opinion text, so both arms are coded from opinions rather than from
-  someone's summary of an opinion.
-- **Control arm** — `../02_build_controls.ipynb` does this offline from the CourtListener bulk
-  snapshot: 2023–2026 opinions ruling on a sanctions / Rule 11 / § 1927 / inherent-authority
-  question that do not involve AI, with the Nature-of-Suit code and attorney fields where
-  available.
+## Control-frame filters
 
-### 3. Screen the controls for contamination
-`label_lib.is_ai_contaminated(text)` runs on every control; anything it trips is dropped. A
-"non-AI" opinion that mentions hallucinated citations is a mislabeled AI case, not a control.
-This happens inside notebook 02.
+Not every opinion that mentions "sanction" is a comparable control. `label_lib` drops three kinds:
 
-### 4. Auto-code both arms
-`label_lib.code_case(text, ai_flag, nos_code=..., docket_attorney_present=...)` returns
-`severity`, `pro_se`, `field`, `contaminated`. Fast, reproducible, and this is the coding the
-regression actually uses.
+- `is_ai_contaminated` — a "non-AI" opinion that mentions hallucinated citations is a mislabeled AI case.
+- `is_bar_discipline` — standalone attorney/judicial discipline proceedings are a different population.
+- `is_criminal_or_licensing` — criminal "community-control sanctions" (a sentencing term) and
+  licensing-board matters are not Rule 11-style litigation sanctions.
 
-### 5. Build the ground-truth sample
-```bash
-python make_handcoding_sample.py --n 90 --seed 20
-```
-Writes `handcoding_template.csv`: ~90 cases stratified so every severity tier appears, with the
-text to read plus blank `hand_severity`, `hand_pro_se`, `hand_field`, `confidence`, `note`.
+Notebook 02 applies all three when it builds the control set.
 
-Point `--csv` at the controls file and set `--text-col` to the opinion-text column to build the
-same template for the control arm.
+## Validation workflow
 
-### 6. Hand-code it
-Fill the blank columns yourself, reading each case and applying the codebook. Mark
-`confidence = low` whenever you had to infer representation or field from prose. If a second
-coder does a slice independently, you also get inter-rater reliability on the *human* codes,
-which is worth reporting.
+1. Notebook 02 writes `controls_validation_40.csv`, a 40-row sample with the text to read and a
+   blank `hand_severity` column.
+2. Hand-code those 40 yourself against the codebook. This is the independent human check — the coder
+   (LLM) cannot also be the validator.
+3. Notebook 05 (or `validate_llm.py`) merges your codes with the LLM codes and reports the kappa.
 
-### 7. Validate
-```bash
-python validate_coding.py --filled handcoding_template.csv --full-opinion
-```
-Drop `--full-opinion` when `text_to_read` is Charlotin's short `Outcome`/`Details` field rather
-than a full opinion — the coder behaves differently on the two and the flag matters.
+Rule of thumb: quadratic-weighted kappa above ~0.7 means the coded variable can carry weight in the
+paper; below ~0.6 means fix the rules or code by hand.
 
-Rule of thumb: quadratic-weighted kappa above ~0.7 on severity means you can lean on the
-automated coding in the paper. Below ~0.6 means fix the rules or code that variable by hand.
+## Keeping rules in sync
 
-### 8. Fix, or fall back
-If a variable validates poorly: tighten the keywords in `label_lib.py` and re-validate, or code
-that variable entirely by hand. Do not report a coefficient resting on a variable with a kappa
-you would not defend out loud.
-
-### 9. Freeze and analyze
-Lock the coded file, note the Charlotin download date, and run the pooled regression: severity
-on an AI dummy plus controls. That AI coefficient is the answer to the reviewer's question.
-
-## Known issue: the coder over-fires on full opinions
-
-`label_lib.py` was tuned on Charlotin's short `Outcome` field. Run against full CourtListener
-opinions it over-assigns tier 4, because a keyword like "dismiss" or "referral" appearing
-*anywhere* in a long document triggers it. `locate_sanction_region()` exists to address this by
-slicing a window around the first sanctions trigger — confirm every severity call on the
-control arm goes through it before comparing severity across arms. The current control severity
-distribution is provisional and skews severe.
-
-## A realistic minimum
-
-Coding all four variables well is a week-plus of work, and representation status may never reach
-a trustworthy kappa on the control arm. A defensible minimum: code `severity`, the `ai` flag,
-`field` from the NOS code, and federal/state; skip `pro_se` for the controls; run the
-severity-on-AI-dummy regression on that. It answers the core question without betting the
-result on the hardest variable to code.
+The keyword lists in `label_lib.py` and the rules in `../../docs/LABELING_CODEBOOK.md` must match.
+If you change one, change the other — the codebook is what the paper cites, the code is what ran.

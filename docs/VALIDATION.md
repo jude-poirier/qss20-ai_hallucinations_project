@@ -1,13 +1,51 @@
-# Validation status
+# Validation
 
-Checked the control severity coder against 40 hand-coded control opinions. Cohen's kappa was 0.20, which is too low to rely on. Raw agreement was higher (0.75) but that's mostly because both the coder and I labeled most cases "no sanction," and kappa removes that easy agreement. On the cases that actually had a sanction imposed, the coder only caught 2 of 8.
+Both arms use the same 0 to 4 severity scale. This is how each side was coded and checked, and
+where the limits are.
 
-Two reasons for the low score. First, on full opinion text the coder misses real sanctions because courts phrase them in more ways than the keywords cover — it missed a default judgment, a monetary deposition sanction, a discovery dismissal, a contempt order, and a judicial suspension. Second, the control pool is contaminated: a lot of the cases the trigger pulled in aren't litigation sanctions at all, mainly criminal "community-control sanctions" (a sentencing term) plus some licensing-board and judicial-conduct matters.
+## AI arm
 
-The second-coder pass was done by Claude Opus 4.8 (High), so it's a provisional machine check rather than independent human coding. I'm treating 0.20 as a sign the control side needs work, not as a final number.
+Coded from Charlotin's short `Outcome` field with the regex coder in `label_lib.py`. Checked
+against a hand-coded sample of 40 at Cohen's kappa 0.87 (quadratic-weighted 0.95). Two early bugs
+turned up in that check and got fixed: negation blindness ("no monetary sanctions imposed" reading
+as monetary) and a phrasing gap ("referral to state bar" missing tier 4). This arm is solid.
 
-Next steps: tighten the control frame to drop criminal community-control sanctions and licensing/judicial-discipline cases, and improve sanction detection in full opinions, then re-run the validation. The number that goes in the paper will come from that re-run, not this one.
+## Control arm
 
-If the control comparison can't be made reliable in time, the project still stands on the within-AI analysis, which doesn't need the control group — the accountability gradient, the severity-by-representation results, and the AI-arm coder (kappa 0.87). There's more within-AI work available there if needed.
+Harder, and it took two tries.
 
-For now the AI vs non-AI comparison is on hold until the control coding is fixed and re-validated. Any pooled figures in `output/` are provisional and shouldn't be read as results.
+The first attempt coded controls with the same regex against full opinions. It looked good in
+sample (kappa 0.92) and then collapsed on a fresh held-out sample (kappa 0.36). That gap is
+overfitting: tuning the keywords to one sample does not carry to the next. Two things drove it.
+Full opinions phrase an imposed sanction in far more ways than keywords catch, so the coder missed
+real sanctions (it caught 2 of 8 in the held-out set). And the trigger pulled in cases that are not
+Rule 11-style litigation sanctions at all, mainly criminal community-control sentencing plus some
+licensing-board and bar-discipline matters.
+
+The fix had two parts. The frame got tightened: `label_lib.is_criminal_or_licensing` and
+`is_bar_discipline` drop the non-comparable cases at the build stage in notebook 02. And the
+severity coding moved to an LLM, which reads the whole passage instead of matching keywords.
+
+The LLM coder was checked against an independent hand-coded sample of 40 controls. Cohen's kappa
+came in at 0.87 (quadratic-weighted 0.89), exact agreement 0.94, with 2 disagreements out of the 33
+that matched by name. One was off by a tier (a vexatious-litigant case coded 4 by hand and 3 by the
+LLM). One was an LLM false positive, reading a declined sanctions motion as an imposed sanction.
+The coder caught every sanction the hand-coding found.
+
+The hand codes are an independent human check. The model that coded the controls did not also
+validate them.
+
+## What validation does not fix
+
+A clean kappa says the controls were coded the way a human would. It does not close the gap in the
+study design. The AI arm is a curated set, meaning cases where a sanction question was already
+adjudicated, and the controls are trigger-matched opinions that are mostly non-events. That
+base-rate difference biases any AI-vs-non-AI comparison on its own, apart from coding quality. The
+pooled result is associational, and that caveat belongs next to it in the paper.
+
+## Bottom line
+
+- AI-arm severity coder: kappa 0.87. Ready.
+- LLM control coder: kappa 0.87 against independent hand codes. Usable, with the base-rate caveat
+  stated.
+- The within-AI findings stand on their own and do not depend on the control group.

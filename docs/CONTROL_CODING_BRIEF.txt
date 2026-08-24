@@ -1,0 +1,115 @@
+========================================================================
+CONTROL-OPINION CODING BRIEF  (hand this to a fresh Claude Opus 4.8 window)
+========================================================================
+
+You are coding U.S. court opinions for a research dataset. Work carefully and
+think through each case before assigning a code. Do not rush; accuracy matters
+more than speed.
+
+------------------------------------------------------------------------
+WHAT THIS IS
+------------------------------------------------------------------------
+The project studies how courts sanction litigants for misconduct. One arm is a
+curated set of AI-hallucination cases; this "control" arm is ordinary (non-AI)
+cases where a court ruled on a sanctions / Rule 11 / 28 U.S.C. 1927 /
+inherent-authority question. Your job: read each control opinion and record
+(a) whether it belongs in the control set at all, and (b) how severe the
+sanction actually imposed was, on a 0-4 scale.
+
+A regex coder was tried first and failed (held-out kappa 0.36): it missed real
+sanctions phrased in unusual ways and false-flagged cases where sanctions were
+only discussed or denied. You are replacing it because reading the text is the
+whole point.
+
+------------------------------------------------------------------------
+INPUT
+------------------------------------------------------------------------
+A CSV named controls_all_fulltext.csv is provided. Relevant columns:
+  - case_name         : case caption
+  - nature_of_suit    : docket category (may be blank)
+  - text_for_coding   : a window of the opinion around the sanctions language
+                        (this is what you read to code)
+  - coder_severity    : the OLD regex label. IGNORE IT. Do not anchor on it.
+
+------------------------------------------------------------------------
+OUTPUT
+------------------------------------------------------------------------
+Produce a downloadable CSV named controls_llm_coded.csv with exactly these
+columns, one row per input row, in the same order:
+  case_name      : copy from input
+  llm_severity   : integer 0-4 (see ladder)
+  llm_eligible   : true or false (see eligibility)
+  llm_confidence : high | medium | low
+  llm_reason     : <= 15 words, why you chose that severity
+
+If the file is large, code it in batches across several messages, then combine
+into one CSV at the end. Never skip rows.
+
+------------------------------------------------------------------------
+SEVERITY LADDER  (code the MOST SEVERE sanction ACTUALLY IMPOSED)
+------------------------------------------------------------------------
+0  None. No sanction imposed. Includes: motion for sanctions DENIED; "sanctions
+   not warranted"; deferred/moot; sanction VACATED or REVERSED on appeal;
+   sanctions merely discussed or requested but not ordered.
+1  Warning. Admonishment, reprimand, caution, rebuke directed at counsel/party.
+2  Procedural / corrective. Brief or filing stricken; order to show cause
+   ISSUED; mandatory CLE; certification/disclosure requirement; forced
+   correction or refiling; spoliation/adverse-inference sanction.
+3  Monetary. Fine; monetary sanction; attorney's-fee award as a sanction;
+   costs shifted as a sanction; disgorgement. A dollar amount ordered paid.
+4  Professional / terminal. Bar or disciplinary referral; suspension or
+   disbarment; disqualification; pro hac vice revocation; DISMISSAL or DEFAULT
+   JUDGMENT entered as a sanction; contempt FINDING; vexatious-litigant or
+   filing bar; censure.
+
+Rule: if several apply, take the highest. If a sanction was clearly imposed but
+the type is unstated (e.g. "granting motion for negotiated sanctions"), code 1
+and mark confidence low.
+
+------------------------------------------------------------------------
+ELIGIBILITY  (llm_eligible)
+------------------------------------------------------------------------
+Mark FALSE (not a comparable control) when the "sanction" is not a Rule 11-type
+litigation sanction. Common cases to EXCLUDE:
+  - Criminal "community-control sanctions" -- this is an Ohio/other sentencing
+    term (probation-like), NOT a litigation sanction. The word "sanction" here
+    is a false friend. Exclude.
+  - Criminal sentencing generally (fines/jail as punishment for the crime).
+  - Licensing-board discipline (medical board, nursing board, etc.).
+  - Standalone attorney or judicial BAR-DISCIPLINE proceedings (e.g.
+    "Disciplinary Counsel v. X", "State Bar", judicial-conduct suspensions).
+    These are real professional discipline but are a different population.
+Still fill llm_severity with your best read even when eligible=false.
+
+------------------------------------------------------------------------
+CODING PRINCIPLES  (these are where the regex failed -- do not repeat them)
+------------------------------------------------------------------------
+1. IMPOSED, not discussed. Code what the court DID. "Motion for sanctions" or a
+   keyword list of statutes is NOT a sanction. Look for an actual imposition.
+2. Watch negation. "denied", "declined to impose", "not warranted", "never held
+   in contempt", "vacated", "reversed" -> the sanction did NOT stand -> 0.
+3. Appellate argument-waiver ("arguments deemed waived for failure to brief") is
+   routine procedure, NOT a sanction -> 0.
+4. A real sanction phrased plainly still counts: "sanctioning the defendant
+   $50,000", "sanctions GRANTED", "ordered to pay ... as a sanction",
+   "default judgment as a discovery sanction", "found in contempt" -> code it.
+5. When the window is ambiguous or cut off, use confidence=low and code
+   conservatively (prefer 0 over inventing a sanction).
+6. Do not anchor on coder_severity. Read the text fresh.
+
+------------------------------------------------------------------------
+AFTER YOU FINISH
+------------------------------------------------------------------------
+State plainly at the end: "Coded by Claude Opus 4.8. These labels are a
+provisional machine coding and must be validated against an independent human
+hand-coded sample before use." This is required -- the coder cannot also be the
+validator.
+
+------------------------------------------------------------------------
+IMPORTANT LIMITATION TO REPORT (not your job to fix, just state it)
+------------------------------------------------------------------------
+Even perfect coding does not make the AI-vs-non-AI comparison clean: the AI arm
+is a curated set (cases where something happened) while these controls are
+trigger-matched opinions (mostly non-events). That base-rate difference is a
+study-design limitation, separate from coding quality.
+========================================================================

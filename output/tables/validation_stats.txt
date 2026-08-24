@@ -1,0 +1,6 @@
+Control severity coding validation (LLM vs hand)
+n = 33
+exact agreement = 0.94
+within-1 tier   = 0.97
+Cohen's kappa   = 0.87
+quadratic-weighted kappa = 0.89
