@@ -23,13 +23,13 @@
   .caption .left{flex:1; padding-right:14px}
   .caption .bars{white-space:pre; font-size:16px; line-height:1.5; padding:0 18px; color:var(--soft)}
   .caption .right{width:210px; padding-left:14px; font-size:15px; align-self:center}
-  .caption .party{font-weight:700; text-transform:uppercase; font-size:15px; letter-spacing:.01em}
-  .caption .inre{font-style:italic; font-weight:400; text-transform:none}
+  .caption .party{font-weight:700; text-transform:none; font-size:19px; letter-spacing:.005em; line-height:1.25}
+  .caption .inre{font-style:italic; font-weight:400; text-transform:none; font-size:14px; margin-bottom:2px}
   .brieftitle{text-align:center; font-weight:700; text-transform:uppercase; letter-spacing:.04em; font-size:17px; margin:18px 0 4px}
   .presiding{text-align:center; font-style:italic; color:var(--soft); font-size:15px; margin-bottom:6px}
   .oral{text-align:center; font-size:12.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); margin:2px 0 26px}
 
-  h2{font-size:17px; font-weight:700; text-transform:uppercase; letter-spacing:.02em; text-align:center; margin:30px 0 10px}
+  h2{font-size:17px; font-weight:700; text-transform:uppercase; letter-spacing:.02em; text-align:center; margin:30px 0 4px}
   h3{font-size:17px; font-weight:700; margin:20px 0 4px}
   p{margin:0 0 4px; text-align:justify; hyphens:auto; text-indent:34px}
   p.flush{text-indent:0}
@@ -59,6 +59,8 @@
     .caption .right{width:auto; padding:8px 0 0; border-top:1px dashed var(--hair); margin-top:10px}
     p{text-indent:24px}
   }
+  .gloss{display:block; font-weight:400; font-style:italic; text-transform:none; font-size:12.5px;
+    color:#2a2620; letter-spacing:0; margin:2px 0 10px}
 </style>
 </head>
 <body>
@@ -72,7 +74,7 @@
   <div class="caption">
     <div class="left">
       <div class="party inre">In re:</div>
-      <div class="party">The Matter of AI-<br>Fabricated Citations</div>
+      <div class="party">The Matter of AI-Fabricated Citations</div>
     </div>
     <div class="bars">)
 )
@@ -86,23 +88,23 @@
   <p class="presiding">Before the Honorable Herbert Chang, presiding</p>
 
   <section>
-    <h2>Questions Presented</h2>
+    <h2>Questions Presented <span class="gloss">(research question)</span></h2>
     <p class="qp">Whether the severity of the sanction a court imposes for a fabricated, AI-generated citation depends on whether the responsible filer is an attorney, a self-represented litigant, or a judge.</p>
     <p class="qp">And whether, holding the features of the case constant, the identity of the filer predicts the court's response better than the conduct itself.</p>
   </section>
 
   <section>
-    <h2>Summary of the Argument</h2>
-    <p>It does, and the record is not close. Attorneys draw a personal penalty, discipline or money, in close to 44 percent of their cases. Self-represented litigants mostly receive a warning. When the fabrication comes from the bench, the court corrects the ruling and imposes nothing on the judge. An ordered logistic regression places a pro se filer's odds of a higher sanction tier at 0.32 against a counseled filer, holding case features constant.<sup><a href="#fn2">2</a></sup> A model given those case features can barely predict severity at all, which returns the weight of the explanation to who filed rather than what was filed.</p>
+    <h2>Summary of the Argument <span class="gloss">(abstract)</span></h2>
+    <p><span style="font-style:italic">This brief follows the project end to end: the question, the record it rests on, the method, the result, and what it means.</span> It does, and the record is not close. Attorneys draw a personal penalty, discipline or money, in close to 44 percent of their cases. Self-represented litigants mostly receive a warning. When the fabrication comes from the bench, the court corrects the ruling and imposes nothing on the judge. An ordered logistic regression places a pro se filer's odds of a higher sanction tier at 0.32 against a counseled filer, holding case features constant.<sup><a href="#fn2">2</a></sup> A model given those case features can barely predict severity at all, which returns the weight of the explanation to who filed rather than what was filed.</p>
   </section>
 
   <section>
-    <h2>Statement of the Case</h2>
+    <h2>Statement of the Case <span class="gloss">(data and methods)</span></h2>
     <p>The AI record is the AI Hallucination Cases Database, a curated catalog of court cases involving AI-fabricated material, comprising 1,848 cases of which 1,279 arise in the United States.<sup><a href="#fn1">1</a></sup> A non-AI comparison group was drawn from CourtListener bulk data by streaming a 2.3 GB file and keeping 2023 to 2026 sanctions rulings, with criminal, licensing, and bar-discipline matters removed. Each case was assigned a responsible actor and a severity tier from 0 (no sanction) to 4 (professional or terminal). The coding was validated against independent hand-coding at Cohen's kappa 0.87.<sup><a href="#fn2">2</a></sup></p>
   </section>
 
   <section>
-    <h2>Argument</h2>
+    <h2>Argument <span class="gloss">(results)</span></h2>
 
     <h3>I. The responses form an accountability gradient.</h3>
     <p>Sorted by the worst consequence on record, the three actors line up cleanly. Attorneys absorb the professional and monetary penalties. Pro se litigants sit at the warning tier. Judges see the ruling undone and face nothing themselves.</p>
@@ -138,7 +140,7 @@
   </section>
 
   <section>
-    <h2>Conclusion</h2>
+    <h2>Conclusion <span class="gloss">(discussion and takeaway)</span></h2>
     <p>The size of the gap carries the finding. Among counseled filers a personal penalty, meaning professional discipline or a monetary sanction, lands in close to 44 percent of cases, with professional discipline alone at about 24 percent. Among pro se filers those categories nearly vanish, and about 52 percent receive no more than a warning. The ordered logit fixes the difference at a pro se odds ratio of 0.32 (95% CI 0.25 to 0.41), holding legal field, court level, and filing year constant, and the estimate holds after clustering by court. Severity trends down across the 2023 to 2026 window, so the gradient is not courts growing harsher over time, and a classifier given the case features reaches only about 0.45 accuracy against a 0.39 baseline.</p>
     <p>So who gets punished comes down to whether the filer is a lawyer. Courts have real tools for lawyers: bar referrals, discipline, fee awards. For a filer who is not a lawyer there is very little a court can reach for. Most fake AI citations still come from lawyers, and if that shifts toward self-represented filers, the courts will be left facing the group they can do the least about. The analyst respectfully submits that the record supports this finding.</p>
   </section>
