@@ -74,6 +74,10 @@
   nav.sidenav a.sub{font-size:10.5px; letter-spacing:.08em; margin:5px 0; color:#8a8478; padding-right:0}
   nav.sidenav a.sub:hover{color:var(--accent)}
   nav.sidenav a.sub.active{color:var(--ink); font-weight:700}
+  nav.sidenav a.parent .caret{font-size:8px; display:inline-block; transition:transform .2s ease; vertical-align:middle}
+  nav.sidenav a.parent.open .caret{transform:rotate(90deg)}
+  nav.sidenav .subwrap{max-height:0; overflow:hidden; transition:max-height .25s ease}
+  nav.sidenav .subwrap.open{max-height:220px}
   section[id], h3[id]{scroll-margin-top:26px}
   /* fallback to a sticky top bar when the desk margin is too narrow for a rail */
   @media (max-width:1200px){
@@ -82,6 +86,8 @@
       padding:9px 8px; margin:0 0 6px; background:var(--paper)}
     nav.sidenav a{display:inline-block; margin:0 9px; font-size:12px; color:var(--ink)}
     nav.sidenav a.sub{font-size:10.5px; margin:0 6px; color:#6b655a}
+    nav.sidenav .subwrap{max-height:none; overflow:visible; display:inline}
+    nav.sidenav a.parent .caret{display:none}
     nav.sidenav a.active{text-decoration:underline; text-underline-offset:3px; font-weight:700}
     section[id], h3[id]{scroll-margin-top:58px}
   }
@@ -95,11 +101,13 @@
     <a href="#questions">Questions</a>
     <a href="#summary">Summary</a>
     <a href="#facts">Data &amp; Methods</a>
-    <a href="#argument">Argument</a>
-    <a class="sub" href="#arg1">I &middot; Gradient</a>
-    <a class="sub" href="#arg2">II &middot; Regression</a>
-    <a class="sub" href="#arg3">III &middot; Prediction</a>
-    <a class="sub" href="#arg4">IV &middot; AI vs control</a>
+    <a href="#argument" class="parent">Argument <span class="caret">&#9656;</span></a>
+    <div class="subwrap">
+      <a class="sub" href="#arg1">I &middot; Gradient</a>
+      <a class="sub" href="#arg2">II &middot; Regression</a>
+      <a class="sub" href="#arg3">III &middot; Prediction</a>
+      <a class="sub" href="#arg4">IV &middot; AI vs control</a>
+    </div>
     <a href="#conclusion">Conclusion</a>
   </nav>
   <p class="court">IN THE COURT OF QSS 20
@@ -228,11 +236,16 @@
   (function(){
     var links=[].slice.call(document.querySelectorAll('nav.sidenav a'));
     var map={}; links.forEach(function(a){ map[a.getAttribute('href').slice(1)]=a; });
+    var parent=document.querySelector('nav.sidenav a.parent');
+    var wrap=document.querySelector('nav.sidenav .subwrap');
+    function setOpen(on){ if(!wrap) return; wrap.classList.toggle('open',on); parent.classList.toggle('open',on); }
+    if(parent){ parent.addEventListener('click', function(){ setOpen(!wrap.classList.contains('open')); }); }
     var obs=new IntersectionObserver(function(entries){
       entries.forEach(function(e){
         if(e.isIntersecting){
           links.forEach(function(a){a.classList.remove('active');});
           var a=map[e.target.id]; if(a)a.classList.add('active');
+          if(e.target.id.indexOf('arg')===0) setOpen(true);
         }
       });
     },{rootMargin:'-30% 0px -60% 0px'});
